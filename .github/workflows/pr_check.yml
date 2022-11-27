@@ -1,0 +1,64 @@
+name: branch build check
+
+on:
+  pull_request:
+    branches: [ main, develop, release ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3.6.0
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: make application.properties
+        run: |
+          cd ./src/main/resources
+          touch ./application.properties
+          echo "${{ secrets.PROPERTIES }}" > ./application.properties
+        shell: bash
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew build
+
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v1
+        if: always()
+        with:
+          files: build/test-results/**/*.xml
+
+
+      - name: On Failed, Notify in Slack
+        if: ${{ failure() }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: '#ff0000'
+          SLACK_ICON: https://avatars.githubusercontent.com/u/108561231?size=48
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_TITLE: 'CI checks have failed ⚠️🚫'
+          MSG_MINIMAL: true
+          SLACK_USERNAME: 어? 도랏노바?
+          SLACK_MESSAGE: 'CI checks 실패했노바⚠️'
+
+      - name: On Success
+        if: ${{ success() }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: '#53A551'
+          SLACK_ICON: https://avatars.githubusercontent.com/u/108561231?size=48
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_TITLE: 'All checks have passed ✅🫡'
+          MSG_MINIMAL: true
+          SLACK_USERNAME: 슈퍼노바
+          SLACK_MESSAGE: 'CI check 성공했노바 🎉'
